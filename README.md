@@ -23,8 +23,11 @@ the **`Packages/`** folder.
 
 ## Install via Sileo (jailbroken iPhone)
 
-1. Get the artifact: GitHub Actions → latest run → *terminal-iphone-roothide-deb*
-   artifact, or build it locally (below). The file is always:
+1. Download the deb straight from this repository — open
+   `Packages/terminal-iphone-app-roothide_2.0.0_iphoneos-arm64e.deb` and press
+   *Download raw file*. The same file is also attached to every build under
+   GitHub Actions → latest run → *terminal-iphone-roothide-deb* artifact, and it
+   can be rebuilt locally (below). It is always named:
 
    ```
    Packages/terminal-iphone-app-roothide_<version>_iphoneos-arm64e.deb
