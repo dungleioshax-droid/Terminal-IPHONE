@@ -1,0 +1,8 @@
+Package: terminal-iphone-app-roothide
+Name: Terminal iPhone App
+Version: 1.0.0
+Architecture: iphoneos-arm64e
+Description: Terminal iPhone native app + environment (Roothide).
+Maintainer: Terminal-IPHONE <dungleioshax@gmail.com>
+Author: dungleioshax-droid
+Section: Utilities

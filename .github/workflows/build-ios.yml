@@ -43,27 +43,20 @@ jobs:
           set -e
           ROOT=deb_roothide
           rm -rf "$ROOT"
-          mkdir -p "$ROOT/DEBIAN" "$ROOT/var/jb/Applications"
+          mkdir -p "$ROOT/DEBIAN" "$ROOT/var/jb/Applications" "$ROOT/var/jb/opt/terminal-iphone" "$ROOT/var/jb/usr/bin" "$ROOT/var/jb/usr/share/terminal-iphone" "$ROOT/var/jb/etc/apt/sources.list.d" "$ROOT/var/jb/var/mobile/terminal-iphone"
           cp -R "ios/build/Build/Products/Release-iphoneos/TerminalIPHONE.app" "$ROOT/var/jb/Applications/"
-          cat > "$ROOT/DEBIAN/control" <<EOF
-          Package: terminal-iphone-app-roothide
-          Name: Terminal iPhone App
-          Version: 1.0.0
-          Architecture: iphoneos-arm64e
-          Description: Terminal iPhone native app (Roothide).
-          Maintainer: Terminal-IPHONE <dungleioshax@gmail.com>
-          Author: dungleioshax-droid
-          Section: Utilities
-          EOF
-          printf '\n' >> "$ROOT/DEBIAN/control"
-          cat > "$ROOT/DEBIAN/postinst" <<'EOF'
-          #!/bin/sh
-          set -e
-          /var/jb/usr/bin/uicache -p /var/jb/Applications/TerminalIPHONE.app 2>/dev/null || true
-          exit 0
-          EOF
+          cp -R app.js assets docs index.html manifest.webmanifest package.json scripts src styles.css sw.js tests "$ROOT/var/jb/opt/terminal-iphone/" 2>/dev/null || true
+          cp scripts/bootstrap-iphone.sh "$ROOT/var/jb/opt/terminal-iphone/scripts/bootstrap-iphone.sh" 2>/dev/null || true
+          cp scripts/bootstrap-iphone.sh "$ROOT/var/jb/usr/share/terminal-iphone/bootstrap-iphone.sh" 2>/dev/null || true
+          cp packaging/terminal-iphone-launcher.sh "$ROOT/var/jb/usr/bin/terminal-iphone"
+          chmod 755 "$ROOT/var/jb/usr/bin/terminal-iphone"
+          echo "deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" > "$ROOT/var/jb/etc/apt/sources.list.d/terminal-iphone.list"
+          cp packaging/control.roothide "$ROOT/DEBIAN/control"
+          cp packaging/postinst.roothide "$ROOT/DEBIAN/postinst"
           chmod 755 "$ROOT/DEBIAN/postinst"
           chmod 755 "$ROOT/DEBIAN"
+          # web clip
+          cp packaging/webclip.mobileconfig "$ROOT/var/jb/opt/terminal-iphone/Terminal.mobileconfig" 2>/dev/null || true
           dpkg-deb --build --root-owner-group "$ROOT" terminal-iphone-app-roothide_1.0.0_iphoneos-arm64e.deb
           ls -lh *.deb
 
