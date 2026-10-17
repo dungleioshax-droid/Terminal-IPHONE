@@ -3,6 +3,7 @@
 //  PTY session: posix_openpt + fork/setsid/TIOCSCTTY + reader thread.
 //
 #import "TIPTYSession.h"
+#import "TILaunchLog.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -215,6 +216,9 @@
 	}
 	const char *cwdStr = strdup(cwd.fileSystemRepresentation ?: "/");
 
+	// If the log stops here on a device, the pty setup or fork() itself is what
+	// hangs, not the shell.
+	TILaunchLogMark(@"pty ready (%dx%d), forking %s", intCols, intRows, shellPath);
 	pid_t pid = fork();
 	if (pid == 0) {
 		// ---- child -------------------------------------------------
@@ -248,6 +252,7 @@
 		return NO;
 	}
 
+	TILaunchLogMark(@"forked pid=%d, master=%d", (int)pid, master);
 	_master = master;
 	_pid = pid;
 	_columns = intCols;

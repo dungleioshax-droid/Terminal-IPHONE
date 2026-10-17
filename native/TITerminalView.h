@@ -18,10 +18,15 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) CGFloat charWidth;
 @property (nonatomic, readonly) CGFloat rowHeight;
 
-/// Recompute contentSize and redraw everything.
+/// Recompute contentSize and redraw everything. While `followsOutput` is YES
+/// the view keeps itself pinned to the bottom, so new shell output stays visible
+/// instead of being appended below the fold.
 - (void)reload;
 - (BOOL)isAtBottom;
 - (void)scrollToBottomAnimated:(BOOL)animated;
+
+/// YES until the user scrolls up; reload() re-pins to the bottom while it holds.
+@property (nonatomic, assign) BOOL followsOutput;
 
 @end
 

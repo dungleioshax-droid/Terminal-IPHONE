@@ -88,6 +88,10 @@
 		[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(viewTapped:)];
 	[self.view addGestureRecognizer:tap];
 
+	// Visible breadcrumb: if this line never shows up, rendering is the problem,
+	// not the shell. It also confirms which build is installed.
+	[self appendLocalMessage:@"Terminal 2.0.2\r\n"];
+
 	// First keystroke arrives as soon as the app opens.
 	[self.keyboard becomeFirstResponder];
 }
@@ -126,6 +130,7 @@
 - (void)startSession {
 	NSString *root = nil;
 	NSString *shell = [TIPTYSession resolveShell:&root];
+	TILaunchLogMark(@"startSession: shell=%@ root=%@", shell ?: @"(none)", root ?: @"(rootful)");
 	if (!shell) {
 		[self appendLocalMessage:
 			@"\r\nNo shell found on this device.\r\n"
@@ -158,11 +163,14 @@
 					      rows:self.buffer.rows
 					     error:&error];
 	if (!ok) {
+		TILaunchLogMark(@"startSession FAILED: %@", error.localizedDescription ?: @"unknown");
 		[self appendLocalMessage:[NSString stringWithFormat:@"\r\nFailed to start shell: %@\r\n",
 					    error.localizedDescription ?: @"unknown error"]];
 		return;
 	}
+	TILaunchLogMark(@"session started pid=%d shell=%@", (int)self.session.processId, shell);
 	self.navigationItem.title = shell.lastPathComponent;
+	[self.terminalView scrollToBottomAnimated:NO];
 }
 
 - (void)restartSession {
@@ -180,14 +188,19 @@
 
 - (void)session:(TIPTYSession *)session didReceiveData:(NSData *)data {
 	(void)session;
-	BOOL stick = [self.terminalView isAtBottom];
+	static BOOL loggedFirstChunk = NO;
+	if (!loggedFirstChunk) {
+		loggedFirstChunk = YES;
+		TILaunchLogMark(@"first output chunk: %lu bytes", (unsigned long)data.length);
+	}
 	[self.parser feed:data];
+	// reload() re-pins to the bottom while the user has not scrolled up.
 	[self.terminalView reload];
-	if (stick) [self.terminalView scrollToBottomAnimated:NO];
 }
 
 - (void)sessionDidExit:(TIPTYSession *)session status:(int)status {
 	(void)session;
+	TILaunchLogMark(@"session exited, status=%d", status);
 	int code = 0;
 	if (WIFEXITED(status)) {
 		code = WEXITSTATUS(status);

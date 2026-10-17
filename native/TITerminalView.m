@@ -4,11 +4,12 @@
 //
 #import "TITerminalView.h"
 
-@interface TITerminalView () {
+@interface TITerminalView () <UIScrollViewDelegate> {
 	UIFont *_font;
 	UIFont *_boldFont;
 	UIFont *_italicFont;
 	UIFont *_boldItalicFont;
+	BOOL _pinning;
 }
 @end
 
@@ -27,6 +28,8 @@
 		if (@available(iOS 11.0, *)) {
 			self.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
 		}
+		self.delegate = self;
+		self.followsOutput = YES;
 		_defaultForegroundColor = [UIColor colorWithRed:0.85 green:0.87 blue:0.87 alpha:1.0];
 		_defaultBackgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.07 alpha:1.0];
 		[self applyFontNamed:@"Menlo"];
@@ -66,7 +69,26 @@
 
 - (void)reload {
 	[self refreshContentSize];
+	if (self.followsOutput) [self pinToBottom];
 	[self setNeedsDisplay];
+}
+
+- (void)pinToBottom {
+	if (self.bounds.size.height <= 0) return;
+	CGFloat visible = self.bounds.size.height - self.contentInset.bottom;
+	CGFloat target = MAX(0, self.contentSize.height - visible);
+	if (fabs(self.contentOffset.y - target) < 0.5) return;
+	_pinning = YES;
+	[self setContentOffset:CGPointMake(self.contentOffset.x, target) animated:NO];
+	_pinning = NO;
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+	(void)scrollView;
+	// Only user-driven scrolling changes the follow state; our own pinning does not.
+	if (_pinning || self.isDragging || self.isDecelerating) {
+		self.followsOutput = [self isAtBottom];
+	}
 }
 
 - (void)refreshContentSize {
