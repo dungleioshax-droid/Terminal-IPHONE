@@ -1,0 +1,71 @@
+name: Build RootHide deb (Linux)
+
+# Builds the native Terminal app and its Debian package entirely on Linux
+# (roothide/theos), verifies the artifact, and publishes everything found in
+# Packages/ as a downloadable artifact.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential perl rsync fakeroot python3 xz-utils git curl ca-certificates
+
+      - name: Clone roothide/theos
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules \
+            https://github.com/roothide/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Install iOS toolchain (Linux)
+        run: |
+          ARCH="$(uname -m)"
+          curl -fsSL "https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-${ARCH}.tar.xz" \
+            | tar -xJf - -C "$THEOS/toolchain/"
+          test -x "$THEOS/toolchain/linux/iphone/bin/clang"
+          "$THEOS/toolchain/linux/iphone/bin/clang" --version
+
+      - name: Install iOS SDK
+        env:
+          # install-sdk queries api.github.com for theos/sdks releases.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$THEOS/bin/install-sdk" latest
+          ls -d "$THEOS"/sdks/iPhoneOS*.sdk
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build deb into Packages/
+        run: node scripts/build.mjs
+
+      - name: Show artifact
+        run: |
+          ls -la Packages/
+          dpkg-deb -f Packages/*.deb Package Version Architecture
+          sha256sum Packages/*.deb | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Packages/*.deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-iphone-roothide-deb
+          path: Packages/*.deb
+          if-no-files-found: error
+          retention-days: 30

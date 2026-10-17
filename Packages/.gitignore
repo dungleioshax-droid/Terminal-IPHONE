@@ -1,0 +1,2 @@
+# Built .deb artifacts land here; CI uploads them from this folder.
+*.deb

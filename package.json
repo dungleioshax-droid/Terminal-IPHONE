@@ -1,10 +1,11 @@
 {
   "name": "terminal-iphone",
   "version": "1.0.0",
-  "description": "A terminal emulator for iPhone, delivered as an installable web app (PWA).",
+  "description": "Native PTY terminal app + Linux/Node.js environment for jailbroken iPhone (RootHide, Sileo), plus a web playground.",
   "type": "commonjs",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "build:deb": "node scripts/build.mjs",
     "serve": "npx --yes http-server . -p 8080 -c-1",
     "lint": "node --check src/terminal-core.js"
   },

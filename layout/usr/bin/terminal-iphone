@@ -1,0 +1,16 @@
+#!/bin/sh
+# Run the Terminal-IPHONE Linux environment bootstrap (Node.js, git, python3,
+# editors, AI CLIs). Works on rootful, rootless (/var/jb) and RootHide installs
+# because the jailbreak root is derived from this script's own location.
+d=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
+if [ -z "$d" ]; then
+	echo "terminal-iphone: cannot resolve own path" >&2
+	exit 1
+fi
+ROOT=$(CDPATH= cd -- "$d/../.." 2>/dev/null && pwd -P)
+BOOT="$ROOT/usr/share/terminal-iphone/bootstrap-iphone.sh"
+if [ ! -f "$BOOT" ]; then
+	echo "terminal-iphone: bootstrap script not found at $BOOT" >&2
+	exit 1
+fi
+exec sh "$BOOT" "$@"

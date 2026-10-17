@@ -1,0 +1,58 @@
+#!/bin/sh
+# Runs after install/upgrade. Registers the SpringBoard icon and kicks off the
+# Linux environment bootstrap (Node.js via nvm, git, python3, ...) in the
+# background. Every jailbreak path is resolved at runtime so the same package
+# works rootful ("" root), rootless (/var/jb) and RootHide (randomized root).
+set -u
+
+# Derive the jailbreak root from a tool that lives in <root>/usr/bin.
+pkg_root() {
+	for tool in apt-get uicache dpkg; do
+		p=$(command -v "$tool" 2>/dev/null) || continue
+		[ -n "$p" ] || continue
+		d=$(dirname "$p")
+		[ "$(basename "$d")" = "bin" ] || continue
+		# Rootful legacy layout: /usr/bin/x lives directly on the system root.
+		if [ "$(dirname "$d")" = "/" ]; then
+			echo ""
+			return 0
+		fi
+		[ "$(basename "$(dirname "$d")")" = "usr" ] || continue
+		(CDPATH= cd -- "$d/../.." 2>/dev/null && pwd -P) && return 0
+	done
+	# Last resort: classic rootless prefix.
+	if [ -x /var/jb/usr/bin/uicache ]; then
+		echo "/var/jb"
+		return 0
+	fi
+	echo ""
+}
+
+ROOT=$(pkg_root)
+APP="${ROOT}/Applications/TerminalIPHONE.app"
+SHARE="${ROOT}/usr/share/terminal-iphone"
+UICACHE="${ROOT}/usr/bin/uicache"
+
+# 1. Register the app icon with SpringBoard.
+if [ -d "$APP" ]; then
+	if [ -x "$UICACHE" ]; then
+		"$UICACHE" -p "$APP" >/dev/null 2>&1 || true
+	elif command -v uicache >/dev/null 2>&1; then
+		uicache -p "$APP" >/dev/null 2>&1 || true
+	fi
+fi
+
+# 2. Bootstrap the Linux/Node.js environment in the background (log kept at a
+#    fixed system path: /var never changes between package schemes).
+BOOT="$SHARE/bootstrap-iphone.sh"
+if [ -f "$BOOT" ]; then
+	mkdir -p /var/mobile/terminal-iphone 2>/dev/null || true
+	LOG=/var/mobile/terminal-iphone/bootstrap.log
+	if [ -x /usr/bin/nohup ]; then
+		/usr/bin/nohup sh "$BOOT" >>"$LOG" 2>&1 &
+	else
+		sh "$BOOT" >>"$LOG" 2>&1 &
+	fi
+fi
+
+exit 0

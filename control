@@ -1,0 +1,16 @@
+Package: terminal-iphone-app-roothide
+Name: Terminal iPhone
+Version: 2.0.0
+Architecture: iphoneos-arm64e
+Maintainer: Terminal-IPHONE <dungleioshax@gmail.com>
+Author: dungleioshax-droid
+Section: Utilities
+Priority: optional
+Depends: firmware (>= 14.0)
+Conflicts: terminal-iphone-roothide
+Replaces: terminal-iphone-roothide
+Tag: role::enduser
+Description: Native PTY terminal for jailbroken iPhone (RootHide/Sileo).
+ Real shell sessions (bash/zsh) on a PTY with a VT100/xterm-style emulator,
+ plus a one-shot Linux environment bootstrap: Node.js via nvm, git, python3
+ and AI CLIs, without repairing APT repositories.
