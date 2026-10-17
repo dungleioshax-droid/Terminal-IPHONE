@@ -3,9 +3,6 @@
 //
 #import "TIKeyboardInput.h"
 
-@interface TIKeyboardInput () <UITextFieldDelegate>
-@end
-
 @implementation TIKeyboardInput {
 	UIView *_accessory;
 	UIButton *_ctrlButton;
@@ -14,32 +11,51 @@
 
 - (instancetype)initWithFrame:(CGRect)frame {
 	if ((self = [super initWithFrame:frame])) {
+		self.backgroundColor = UIColor.clearColor;
+		// Traits that keep the keyboard suitable for a terminal: no smart
+		// punctuation, no autocorrect, no autocapitalisation.
 		self.autocapitalizationType = UITextAutocapitalizationTypeNone;
 		self.autocorrectionType = UITextAutocorrectionTypeNo;
 		self.spellCheckingType = UITextSpellCheckingTypeNo;
-		self.returnKeyType = UIReturnKeyDefault;
+		self.keyboardType = UIKeyboardTypeASCIICapable;
 		self.keyboardAppearance = UIKeyboardAppearanceDark;
+		self.returnKeyType = UIReturnKeyDefault;
+		self.secureTextEntry = NO;
+		self.enablesReturnKeyAutomatically = NO;
 		self.textContentType = nil;
 		if (@available(iOS 11.0, *)) {
 			self.smartQuotesType = UITextSmartQuotesTypeNo;
 			self.smartDashesType = UITextSmartDashesTypeNo;
 			self.smartInsertDeleteType = UITextSmartInsertDeleteTypeNo;
 		}
-		self.delegate = self;
-		self.secureTextEntry = NO;
 	}
 	return self;
 }
 
-#pragma mark - UIKeyInput plumbing
+- (void)refreshFirstResponder {
+	if (!self.isFirstResponder) [self becomeFirstResponder];
+}
+
+#pragma mark - Responder
+
+- (BOOL)canBecomeFirstResponder {
+	return YES;
+}
+
+#pragma mark - UIKeyInput
 
 - (BOOL)hasText {
-	// Always claim content so backspace events keep flowing to deleteBackward.
+	// Always claim content so backspace keeps arriving as deleteBackward.
 	return YES;
 }
 
 - (void)insertText:(NSString *)text {
 	if (text.length == 0) return;
+	// The return key delivers "\n" through this path.
+	if ([text isEqualToString:@"\n"]) {
+		if (self.returnHandler) self.returnHandler();
+		return;
+	}
 	if (self.textHandler) self.textHandler(text);
 }
 
@@ -47,14 +63,17 @@
 	if (self.backspaceHandler) self.backspaceHandler();
 }
 
+#pragma mark - Editing actions
+
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
 	// Paste is the only system action a terminal benefits from.
 	return action == @selector(paste:);
 }
 
-- (BOOL)textFieldShouldReturn:(UITextField *)textField {
-	if (self.returnHandler) self.returnHandler();
-	return NO;
+- (void)paste:(id)sender {
+	(void)sender;
+	NSString *text = UIPasteboard.generalPasteboard.string;
+	if (text.length > 0 && self.textHandler) self.textHandler(text);
 }
 
 #pragma mark - Ctrl latch
@@ -89,9 +108,8 @@
 
 	CGFloat x = 6;
 	x = [self addKeyTo:scroll title:@"esc" key:TIKeyEscape x:x width:38];
-	_ctrlButton = _ctrlButton ?: nil;
-	CGFloat ctrlX = x;
-	x = [self addKeyTo:scroll title:@"ctrl" key:TIKeyControl x:ctrlX width:46];
+	_ctrlButton = nil;
+	x = [self addKeyTo:scroll title:@"ctrl" key:TIKeyControl x:x width:46];
 	_ctrlButton = (UIButton *)[scroll viewWithTag:TIKeyControl];
 	x = [self addKeyTo:scroll title:@"tab" key:TIKeyTab x:x width:40];
 	x = [self addKeyTo:scroll title:@"↑" key:TIKeyUp x:x width:32];
@@ -108,7 +126,7 @@
 
 - (CGFloat)addKeyTo:(UIScrollView *)scroll
 	       title:(NSString *)title
-		key:(NSInteger)key
+		 key:(NSInteger)key
 		   x:(CGFloat)x
 	      width:(CGFloat)width {
 	UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];

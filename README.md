@@ -41,7 +41,7 @@ the **`dist/`** folder.
    Sileo → Install, or from a shell:
 
    ```sh
-   dpkg -i terminal-iphone-app-roothide_2.0.2_iphoneos-arm64e.deb
+   dpkg -i terminal-iphone-app-roothide_2.0.3_iphoneos-arm64e.deb
    ```
 
 3. `postinst` registers the icon via `uicache` and starts the background
@@ -59,9 +59,17 @@ the **`dist/`** folder.
 
 ## Troubleshooting: app closes right after tapping the icon
 
+2.0.3 replaces the hidden `UITextField` with a `UIView <UIKeyInput>` responder.
+UIKit sends keystrokes straight to `insertText:` for a `UIKeyInput` responder,
+but a `UITextField` keeps its own text machinery (and marked text, which
+Vietnamese input uses), so keys could be swallowed before reaching the shell.
+The navigation title now also shows `k<n>` (keys received) next to the session
+state, which distinguishes "keys never arrive" from "keys arrive but the shell is
+silent" without needing a log file.
+
 2.0.2 pins the terminal view to the bottom while you have not scrolled up (before
 this, output was appended below the fold and the screen looked empty), and shows a
-`Terminal 2.0.2` breadcrumb plus a launch log.
+`Terminal 2.0.3` breadcrumb plus a launch log.
 
 2.0.1 builds the app for **arm64** and uses RootHide's documented entitlements
 (`platform-application`, `no-sandbox`, `storage.AppBundles`,

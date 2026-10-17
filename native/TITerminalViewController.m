@@ -20,11 +20,23 @@
 @property (nonatomic, assign) CGFloat keyboardOverlap;
 @property (nonatomic, assign) BOOL sessionStarted;
 @property (nonatomic, assign) BOOL ctrlLatch;
+// Ugly but decisive diagnostics: the navigation bar is drawn by UIKit, so it
+// proves whether keys arrive even if our own renderer is broken.
+@property (nonatomic, copy) NSString *statusDetail;
+@property (nonatomic, assign) NSInteger keyCount;
+@property (nonatomic, assign) BOOL titleFromShell;
 @end
 
 @implementation TITerminalViewController
 
 #pragma mark - View lifecycle
+
+- (void)updateStatus:(NSString *)detail {
+	self.statusDetail = detail ?: @"";
+	if (self.titleFromShell) return;
+	self.navigationItem.title =
+		[NSString stringWithFormat:@"%@ k%ld", self.statusDetail, (long)self.keyCount];
+}
 
 - (void)loadView {
 	TILaunchLogMark(@"loadView");
@@ -47,7 +59,7 @@
 
 	self.terminalView.buffer = self.buffer;
 
-	self.keyboard = [[TIKeyboardInput alloc] initWithFrame:CGRectZero];
+	self.keyboard = [[TIKeyboardInput alloc] initWithFrame:CGRectMake(0, 0, 1, 1)];
 	__weak typeof(self) weakSelf = self;
 	self.keyboard.textHandler = ^(NSString *text) {
 		[weakSelf sendText:text];
@@ -64,6 +76,7 @@
 	[self.view addSubview:self.keyboard];
 
 	self.title = @"Terminal";
+	[self updateStatus:@"boot"];
 	self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
 		initWithTitle:@"⌨"
 		style:UIBarButtonItemStylePlain
@@ -90,7 +103,7 @@
 
 	// Visible breadcrumb: if this line never shows up, rendering is the problem,
 	// not the shell. It also confirms which build is installed.
-	[self appendLocalMessage:@"Terminal 2.0.2\r\n"];
+	[self appendLocalMessage:@"Terminal 2.0.3\r\n"];
 
 	// First keystroke arrives as soon as the app opens.
 	[self.keyboard becomeFirstResponder];
@@ -131,7 +144,9 @@
 	NSString *root = nil;
 	NSString *shell = [TIPTYSession resolveShell:&root];
 	TILaunchLogMark(@"startSession: shell=%@ root=%@", shell ?: @"(none)", root ?: @"(rootful)");
+	[self updateStatus:[NSString stringWithFormat:@"sh:%@", shell.lastPathComponent ?: @"?"]];
 	if (!shell) {
+		[self updateStatus:@"no shell"];
 		[self appendLocalMessage:
 			@"\r\nNo shell found on this device.\r\n"
 			 @"Install zsh/bash (apt) or run \"terminal-iphone\" to bootstrap\r\n"
@@ -164,12 +179,14 @@
 					     error:&error];
 	if (!ok) {
 		TILaunchLogMark(@"startSession FAILED: %@", error.localizedDescription ?: @"unknown");
+		[self updateStatus:@"start failed"];
 		[self appendLocalMessage:[NSString stringWithFormat:@"\r\nFailed to start shell: %@\r\n",
 					    error.localizedDescription ?: @"unknown error"]];
 		return;
 	}
 	TILaunchLogMark(@"session started pid=%d shell=%@", (int)self.session.processId, shell);
-	self.navigationItem.title = shell.lastPathComponent;
+	[self updateStatus:[NSString stringWithFormat:@"%@ pid%d",
+				  shell.lastPathComponent, (int)self.session.processId]];
 	[self.terminalView scrollToBottomAnimated:NO];
 }
 
@@ -192,6 +209,8 @@
 	if (!loggedFirstChunk) {
 		loggedFirstChunk = YES;
 		TILaunchLogMark(@"first output chunk: %lu bytes", (unsigned long)data.length);
+		[self updateStatus:[NSString stringWithFormat:@"%@ rx%lu",
+				  self.statusDetail, (unsigned long)data.length]];
 	}
 	[self.parser feed:data];
 	// reload() re-pins to the bottom while the user has not scrolled up.
@@ -221,7 +240,9 @@
 }
 
 - (void)terminalParserDidReceiveTitle:(NSString *)title {
-	self.navigationItem.title = title.length > 0 ? title : @"Terminal";
+	if (title.length == 0) return;
+	self.titleFromShell = YES;
+	self.navigationItem.title = title;
 }
 
 #pragma mark - Input
@@ -251,6 +272,8 @@ static NSData *TransformWithCtrl(NSString *text) {
 
 - (void)sendText:(NSString *)text {
 	if (text.length == 0) return;
+	self.keyCount += 1;
+	[self updateStatus:self.statusDetail];
 	NSData *payload = nil;
 	if (self.ctrlLatch && text.length == 1) {
 		payload = TransformWithCtrl(text);
@@ -267,6 +290,8 @@ static NSData *TransformWithCtrl(NSString *text) {
 }
 
 - (void)sendBytes:(const char *)bytes length:(NSUInteger)length {
+	self.keyCount += 1;
+	[self updateStatus:self.statusDetail];
 	[self.session sendData:[NSData dataWithBytes:bytes length:length]];
 }
 
@@ -307,6 +332,8 @@ static NSData *TransformWithCtrl(NSString *text) {
 		default: return;
 	}
 	if (sequence.length > 0) {
+		self.keyCount += 1;
+		[self updateStatus:self.statusDetail];
 		NSData *data = [sequence dataUsingEncoding:NSUTF8StringEncoding];
 		[self.session sendData:data];
 	}
