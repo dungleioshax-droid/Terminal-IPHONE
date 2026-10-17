@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  # Also build on pull requests, so the deb artifact is downloadable before
+  # the branch is merged into main.
+  pull_request:
 
 jobs:
   build:
