@@ -55,7 +55,7 @@ jobs:
           Author: dungleioshax-droid
           Section: Utilities
           EOF
-          printf '\n' >> "$ROOT/var/jb/DEBIAN/control"
+          printf '\n' >> "$ROOT/DEBIAN/control"
           cat > "$ROOT/DEBIAN/postinst" <<'EOF'
           #!/bin/sh
           set -e
