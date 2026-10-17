@@ -202,20 +202,22 @@
 }
 
 #pragma mark - TIPTYSessionDelegate
-
-- (void)session:(TIPTYSession *)session didReceiveData:(NSData *)data {
-	(void)session;
-	static BOOL loggedFirstChunk = NO;
-	if (!loggedFirstChunk) {
-		loggedFirstChunk = YES;
-		TILaunchLogMark(@"first output chunk: %lu bytes", (unsigned long)data.length);
-		[self updateStatus:[NSString stringWithFormat:@"%@ rx%lu",
-				  self.statusDetail, (unsigned long)data.length]];
+	- (void)session:(TIPTYSession *)session didReceiveData:(NSData *)data {
+		(void)session;
+		static BOOL loggedFirstChunk = NO;
+		if (!loggedFirstChunk) {
+			loggedFirstChunk = YES;
+			TILaunchLogMark(@"first output chunk: %lu bytes", (unsigned long)data.length);
+			[self updateStatus:[NSString stringWithFormat:@"%@ rx%lu",
+					  self.statusDetail, (unsigned long)data.length]];
+		}
+		[self.parser feed:data];
+		// reload() re-pins to the bottom while the user has not scrolled up.
+		[self.terminalView reload];
+		// Force a display pass right away so coalesced draw is not the only one.
+		[self.terminalView setNeedsDisplay];
 	}
-	[self.parser feed:data];
-	// reload() re-pins to the bottom while the user has not scrolled up.
-	[self.terminalView reload];
-}
+
 
 - (void)sessionDidExit:(TIPTYSession *)session status:(int)status {
 	(void)session;

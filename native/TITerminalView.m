@@ -68,9 +68,16 @@
 }
 
 - (void)reload {
+	// Coalesced display; this is what finally triggers drawRect().
 	[self refreshContentSize];
 	if (self.followsOutput) [self pinToBottom];
 	[self setNeedsDisplay];
+}
+
+- (void)didMoveToWindow {
+	[super didMoveToWindow];
+	// Ensure font metrics exist even if reload ran before the view was sized.
+	if (_rowHeight <= 0) [self applyFontNamed:@"Menlo"];
 }
 
 - (void)pinToBottom {
@@ -186,7 +193,11 @@ static void AppendUTF32(NSMutableString *string, uint32_t cp) {
 }
 
 - (void)drawRect:(CGRect)rect {
-	if (_rowHeight <= 0) return;
+	if (_rowHeight <= 0) {
+		// Guard against any code path that skipped font setup.
+		if (!_font) [self applyFontNamed:@"Menlo"];
+		if (_rowHeight <= 0) return;
+	}
 	[_defaultBackgroundColor setFill];
 	UIRectFill(rect);
 
