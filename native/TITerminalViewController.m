@@ -8,6 +8,7 @@
 #import "TITerminalView.h"
 #import "TIPTYSession.h"
 #import "TIKeyboardInput.h"
+#import "TILaunchLog.h"
 
 @interface TITerminalViewController () <TITerminalParserDelegate, TIPTYSessionDelegate>
 @property (nonatomic, strong) TITerminalView *terminalView;
@@ -26,6 +27,7 @@
 #pragma mark - View lifecycle
 
 - (void)loadView {
+	TILaunchLogMark(@"loadView");
 	TITerminalView *view = [[TITerminalView alloc] initWithFrame:UIScreen.mainScreen.bounds];
 	self.terminalView = view;
 	self.view = view;
@@ -33,6 +35,7 @@
 
 - (void)viewDidLoad {
 	[super viewDidLoad];
+	TILaunchLogMark(@"viewDidLoad");
 
 	self.buffer = [[TITerminalBuffer alloc] initWithColumns:40 rows:12];
 	self.parser = [[TITerminalParser alloc] init];

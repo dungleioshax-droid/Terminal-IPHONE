@@ -41,7 +41,7 @@ the **`dist/`** folder.
    Sileo → Install, or from a shell:
 
    ```sh
-   dpkg -i terminal-iphone-app-roothide_2.0.0_iphoneos-arm64e.deb
+   dpkg -i terminal-iphone-app-roothide_2.0.1_iphoneos-arm64e.deb
    ```
 
 3. `postinst` registers the icon via `uicache` and starts the background
@@ -56,6 +56,24 @@ the **`dist/`** folder.
    Node.js. Architecture is `iphoneos-arm64e` (RootHide/Sileo), payload paths
    are rootful-style so RootHide's dpkg relocates them into its randomized
    jailbreak root.
+
+## Troubleshooting: app closes right after tapping the icon
+
+2.0.1 builds the app for **arm64** and uses RootHide's documented entitlements
+(`platform-application`, `no-sandbox`, `storage.AppBundles`,
+`storage.AppDataContainers`); 2.0.0 was arm64e with the old ABI v1 plus a
+`no-container` entitlement, which iOS 17 / RootHide kills on launch.
+
+If it still exits, the app writes milestones to a log on disk:
+
+```sh
+cat /var/mobile/Library/Logs/terminal-iphone/launch.log
+# fallback if /var/mobile is not writable: /tmp/terminal-iphone-launch.log
+```
+
+- No file at all → the process died before `main()` (loader/signature problem)
+- `main()` logged, nothing after → crash inside UIKit setup
+- `UNCAUGHT EXCEPTION` / `FATAL SIGNAL` lines → the exact reason
 
 ## Build the .deb (Linux)
 

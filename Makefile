@@ -1,5 +1,9 @@
 TARGET := iphone:clang:16.5:14.0
-ARCHS := arm64e
+# arm64, not arm64e: the Linux toolchain (clang 11) can only emit the old arm64e
+# ABI v1 (cpusubtype 0x2, no 0x80 capability bit), which is what gets killed on
+# launch on iOS 17. A plain arm64 slice runs natively on every arm64e device and
+# a standalone app has no reason to carry the private arm64e ABI.
+ARCHS := arm64
 
 # Every built .deb lands in ./dist (the requested output folder).
 # `?=` in Theos' common.mk will not override this assignment.
@@ -19,6 +23,7 @@ TerminalIPHONE_FILES = \
 	native/TITerminalBuffer.m \
 	native/TITerminalParser.m \
 	native/TITerminalView.m \
+	native/TILaunchLog.m \
 	native/TIKeyboardInput.m
 
 TerminalIPHONE_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore
