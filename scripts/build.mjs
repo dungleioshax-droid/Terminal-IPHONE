@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 //
-// Build the RootHide .deb on Linux and verify it lands in Packages/.
+// Build the RootHide .deb on Linux and verify it lands in dist/.
 //
 //   THEOS=/path/to/roothide/theos node scripts/build.mjs
 //
 // Without THEOS set it falls back to ~/theos. The roothide package scheme is
 // applied here so a plain `npm run build:deb` always produces the Sileo-ready
-// iphoneos-arm64e artifact in Packages/.
+// iphoneos-arm64e artifact in dist/.
 //
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const PACKAGES_DIR = join(PROJECT_ROOT, 'Packages');
+export const DIST_DIR = join(PROJECT_ROOT, 'dist');
 export const SCHEME = 'roothide';
 
 /// Parse a Debian control stanza (handles multiline `Description:` values).
@@ -126,10 +126,10 @@ export function main() {
 		PATH: pathParts.join(delimiter),
 	};
 
-	const artifact = join(PACKAGES_DIR, debFileName(
+	const artifact = join(DIST_DIR, debFileName(
 		expected.Package, expected.Version, expected.Architecture,
 	));
-	mkdirSync(PACKAGES_DIR, { recursive: true });
+	mkdirSync(DIST_DIR, { recursive: true });
 	if (existsSync(artifact)) rmSync(artifact);
 
 	info(`THEOS=${theos}`);
@@ -137,14 +137,14 @@ export function main() {
 	run('make', ['package', 'FINALPACKAGE=1', `THEOS_PACKAGE_SCHEME=${SCHEME}`], { env });
 
 	if (!existsSync(artifact)) {
-		const dir = readdirSync(PACKAGES_DIR);
+		const dir = readdirSync(DIST_DIR);
 		fail(
-			`expected ${artifact} but Packages/ contains: ${dir.join(', ') || '(nothing)'}`,
+			`expected ${artifact} but dist/ contains: ${dir.join(', ') || '(nothing)'}`,
 		);
 	}
 	verifyDeb(artifact, expected);
 	const { size } = statSync(artifact);
-	info(`\u2713 output: ${join('Packages', debFileName(
+	info(`\u2713 output: ${join('dist', debFileName(
 		expected.Package, expected.Version, expected.Architecture,
 	))} (${(size / 1024).toFixed(1)} KiB)`);
 }

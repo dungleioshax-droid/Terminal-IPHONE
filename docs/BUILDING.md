@@ -37,7 +37,7 @@ which runs:
 make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
 ```
 
-and verifies + emits `Packages/<Package>_<Version>_iphoneos-arm64e.deb`.
+and verifies + emits `dist/<Package>_<Version>_iphoneos-arm64e.deb`.
 
 ## Notes
 

@@ -1,3 +1,0 @@
-# Built .deb artifacts land here. They are committed on purpose so the package
-# can be downloaded straight from the repository (raw file), and CI also
-# uploads Packages/*.deb as a workflow artifact.

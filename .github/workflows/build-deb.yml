@@ -2,7 +2,7 @@ name: Build RootHide deb (Linux)
 
 # Builds the native Terminal app and its Debian package entirely on Linux
 # (roothide/theos), verifies the artifact, and publishes everything found in
-# Packages/ as a downloadable artifact.
+# dist/ as a downloadable artifact.
 
 on:
   workflow_dispatch:
@@ -56,19 +56,29 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build deb into Packages/
+      - name: Build deb into dist/
         run: node scripts/build.mjs
+
+      # dist/ may hold older packages too, so resolve the one this build just
+      # produced instead of globbing the whole folder into the artifact.
+      - name: Resolve the built package
+        id: artifact
+        run: |
+          VERSION="$(sed -n 's/^Version: *//p' control)"
+          FILE="dist/terminal-iphone-app-roothide_${VERSION}_iphoneos-arm64e.deb"
+          test -f "$FILE"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          sha256sum "$FILE" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Show artifact
         run: |
-          ls -la Packages/
-          dpkg-deb -f Packages/*.deb Package Version Architecture
-          sha256sum Packages/*.deb | tee -a "$GITHUB_STEP_SUMMARY"
+          ls -la dist/
+          dpkg-deb -f "${{ steps.artifact.outputs.file }}" Package Version Architecture
 
-      - name: Upload Packages/*.deb artifact
+      - name: Upload deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: terminal-iphone-roothide-deb
-          path: Packages/*.deb
+          path: ${{ steps.artifact.outputs.file }}
           if-no-files-found: error
           retention-days: 30

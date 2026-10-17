@@ -5,7 +5,7 @@ A **native terminal emulator for jailbroken iPhone** — real PTY shell sessions
 environment bootstrap** (Node.js via nvm, git, python3, AI CLIs) and a browser
 PWA playground. The Debian package is built **entirely on Linux** with
 [Theos](https://theos.dev) (`roothide/theos`) in GitHub Actions and lands in
-the **`Packages/`** folder.
+the **`dist/`** folder.
 
 ## App features
 
@@ -24,14 +24,18 @@ the **`Packages/`** folder.
 ## Install via Sileo (jailbroken iPhone)
 
 1. Download the deb straight from this repository — open
-   `Packages/terminal-iphone-app-roothide_2.0.0_iphoneos-arm64e.deb` and press
+   `dist/terminal-iphone-app-roothide_2.0.0_iphoneos-arm64e.deb` and press
    *Download raw file*. The same file is also attached to every build under
    GitHub Actions → latest run → *terminal-iphone-roothide-deb* artifact, and it
    can be rebuilt locally (below). It is always named:
 
    ```
-   Packages/terminal-iphone-app-roothide_<version>_iphoneos-arm64e.deb
+   dist/terminal-iphone-app-roothide_<version>_iphoneos-arm64e.deb
    ```
+
+   > `dist/` still holds the superseded `1.0.0` packages for historical reasons.
+   > Install **`2.0.0`** — the `1.0.0` builds are the old WebView wrapper and run
+   > no shell on the device.
 
 2. Transfer it to the device (AirDrop, SSH, or through your own Sileo repo) and open it in
    Sileo → Install, or from a shell:
@@ -59,7 +63,7 @@ the **`Packages/`** folder.
 
 Push to `main` (or run the workflow manually): `Build RootHide deb (Linux)`
 clones `roothide/theos`, installs the iOS toolchain + SDK on `ubuntu-latest`,
-runs the test suite and uploads `Packages/*.deb` as an artifact.
+runs the test suite and uploads the fresh `dist/*.deb` as an artifact.
 
 ### Locally on any Linux box
 
@@ -77,7 +81,7 @@ THEOS=~/theos npm run build:deb      # = node scripts/build.mjs
 
 `scripts/build.mjs` always runs `make package FINALPACKAGE=1
 THEOS_PACKAGE_SCHEME=roothide`, verifies `Package`/`Version`/`Architecture`
-with `dpkg-deb`, and writes the artifact into `Packages/`. See
+with `dpkg-deb`, and writes the artifact into `dist/`. See
 `docs/BUILDING.md` for details (including the bundled `plistutil` shim).
 
 ## Test
@@ -99,7 +103,8 @@ npm test    # node:test — PWA shell + build-script unit tests
 - `scripts/` — `build.mjs` (build + verify), `bootstrap-iphone.sh`
   (device-side Linux env), `plistutil` (Python shim)
 - `src/terminal-core.js`, `app.js`, … — PWA playground (browser terminal)
-- `tests/` — test suite; `Packages/` — build output (`*.deb` ignored in git)
+- `tests/` — test suite; `dist/` — built `.deb` packages (committed, so they can
+  be downloaded straight from the repo)
 - `ios/` — legacy Swift/WebView wrapper from the old macOS/Xcode flow; kept for
   reference, not part of the Linux pipeline and not built by CI
 

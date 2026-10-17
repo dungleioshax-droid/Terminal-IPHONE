@@ -1,9 +1,9 @@
 TARGET := iphone:clang:16.5:14.0
 ARCHS := arm64e
 
-# Every built .deb lands in ./Packages (the requested output folder).
+# Every built .deb lands in ./dist (the requested output folder).
 # `?=` in Theos' common.mk will not override this assignment.
-THEOS_PACKAGE_DIR := Packages
+THEOS_PACKAGE_DIR := dist
 
 INSTALL_TARGET_PROCESSES = TerminalIPHONE
 
