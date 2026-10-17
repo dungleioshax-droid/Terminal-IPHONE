@@ -15,10 +15,8 @@ to find Node.js.
    and runs the bootstrap in the background (Node.js via nvm, Git, Python, editors,
    AI CLIs).
 
-Prebuilt packages:
-- `dist/terminal-iphone_1.0.0_iphoneos-arm.deb` (legacy jailbreak)
-- `dist/terminal-iphone_1.0.0_iphoneos-arm64.deb` (modern jailbreak)
-- `dist/terminal-iphone-roothide_1.0.0_iphoneos-arm64e.deb` (Roothide, installs under /var/jb)`
+Prebuilt package (GitHub Actions, native app):
+- `dist/terminal-iphone-app-roothide_1.0.0_iphoneos-arm64e.deb` — native iOS app bundle + environment (Roothide, `/var/jb`).
 
 See `docs/LINUX_IPHONE.md` and `scripts/bootstrap-iphone.sh`.
 
