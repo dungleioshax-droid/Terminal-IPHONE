@@ -1,0 +1,74 @@
+name: Build iOS App (Roothide deb)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          brew install xcodegen dpkg ldid
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build app (unsigned)
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project TerminalIPHONE.xcodeproj \
+            -scheme TerminalIPHONE \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Sign binary with ldid
+        run: |
+          APP="ios/build/Build/Products/Release-iphoneos/TerminalIPHONE.app"
+          ldid -S "$APP/TerminalIPHONE" || true
+
+      - name: Package Roothide deb
+        run: |
+          set -e
+          ROOT=deb_roothide
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/DEBIAN" "$ROOT/var/jb/Applications"
+          cp -R "ios/build/Build/Products/Release-iphoneos/TerminalIPHONE.app" "$ROOT/var/jb/Applications/"
+          cat > "$ROOT/DEBIAN/control" <<EOF
+          Package: terminal-iphone-app-roothide
+          Name: Terminal iPhone App
+          Version: 1.0.0
+          Architecture: iphoneos-arm64e
+          Description: Terminal iPhone native app (Roothide).
+          Maintainer: Terminal-IPHONE <dungleioshax@gmail.com>
+          Author: dungleioshax-droid
+          Section: Utilities
+          EOF
+          printf '\n' >> "$ROOT/var/jb/DEBIAN/control"
+          cat > "$ROOT/DEBIAN/postinst" <<'EOF'
+          #!/bin/sh
+          set -e
+          /var/jb/usr/bin/uicache -p /var/jb/Applications/TerminalIPHONE.app 2>/dev/null || true
+          exit 0
+          EOF
+          chmod 755 "$ROOT/DEBIAN/postinst"
+          chmod 755 "$ROOT/DEBIAN"
+          dpkg-deb --build --root-owner-group "$ROOT" terminal-iphone-app-roothide_1.0.0_iphoneos-arm64e.deb
+          ls -lh *.deb
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-iphone-app-roothide-deb
+          path: "*.deb"

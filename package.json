@@ -1,0 +1,13 @@
+{
+  "name": "terminal-iphone",
+  "version": "1.0.0",
+  "description": "A terminal emulator for iPhone, delivered as an installable web app (PWA).",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "npx --yes http-server . -p 8080 -c-1",
+    "lint": "node --check src/terminal-core.js"
+  },
+  "keywords": ["terminal", "iphone", "pwa"],
+  "license": "MIT"
+}

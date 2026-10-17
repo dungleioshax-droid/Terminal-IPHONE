@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Terminal" />
+  <title>Terminal — iPhone</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/assets/icon-192.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="bar">
+      <span class="title">Terminal</span>
+      <button id="btn-clear" aria-label="Clear">Clear</button>
+    </header>
+    <main id="terminal" tabindex="0">
+      <div id="output"></div>
+      <div id="prompt-line">
+        <span id="prompt"></span>
+        <span id="input-wrap"><input id="input" type="text" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false" inputmode="text" /></span>
+      </div>
+    </main>
+    <nav id="toolbar" aria-label="Special keys">
+      <button data-key="Tab">Tab</button>
+      <button data-key="Control">Ctrl</button>
+      <button data-key="ArrowUp">↑</button>
+      <button data-key="ArrowDown">↓</button>
+      <button data-key="ArrowLeft">←</button>
+      <button data-key="ArrowRight">→</button>
+      <button data-key="Escape">Esc</button>
+      <button data-key="Enter">Enter</button>
+    </nav>
+  </div>
+  <script src="/src/terminal-core.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
