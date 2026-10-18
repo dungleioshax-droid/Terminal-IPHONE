@@ -54,47 +54,140 @@ protocol SubProcessDelegate: AnyObject {
 
 class SubProcess {
 
-	private static let loginHelper: String = Bundle.main.path(forAuxiliaryExecutable: "NewTermLoginHelper")!
+	private static let loginHelper: String? = Bundle.main.path(forAuxiliaryExecutable: "NewTermLoginHelper")
 
-	private static let loginIsShell: Bool = {
+	/// The jailbreak root, derived from the app bundle itself (`<root>/Applications/NewTerm.app`).
+	/// Classic rootless jailbreaks use `/var/jb`, but roothide bootstraps install into a
+	/// randomised directory with no `/var/jb` symlink, so probing our own bundle path is the
+	/// only reliable way to find the bootstrap’s tools (`login`, `zsh`, …) there.
+	private static let jailbreakRoot: String = {
 		#if targetEnvironment(simulator)
-		true
+		return ""
 		#else
-		// TODO: Temporary workaround for XinaA15
-		(try? URL(fileURLWithPath: "/var/Liy/xina").checkResourceIsReachable()) == true
+		guard let executablePath = Bundle.main.executablePath, !executablePath.isEmpty else {
+			return ""
+		}
+		let appDirectory = (executablePath as NSString).deletingLastPathComponent
+		let applicationsDirectory = (appDirectory as NSString).deletingLastPathComponent
+		guard (applicationsDirectory as NSString).lastPathComponent == "Applications",
+					applicationsDirectory.count > "/Applications".count else {
+			return ""
+		}
+		return applicationsDirectory
 		#endif
 	}()
 
-	private static let login: String = {
-		#if targetEnvironment(simulator)
-		return "/bin/zsh"
-		#elseif targetEnvironment(macCatalyst)
+	/// Candidate jailbreak prefixes, most specific first. An empty string means the system root.
+	private static let jailbreakRoots: [String] = {
+		var roots: [String] = []
+		if !jailbreakRoot.isEmpty {
+			roots.append(jailbreakRoot)
+		}
+		if jailbreakRoot != "/var/jb" {
+			roots.append("/var/jb")
+		}
+		roots.append("")
+		return roots
+	}()
+
+	/// Finds the first executable among `<root>/<subPath>` for each candidate root.
+	private static func findTool(_ subPaths: [String]) -> String? {
+		for root in jailbreakRoots {
+			for subPath in subPaths {
+				let path = root.isEmpty ? "/\(subPath)" : "\(root)/\(subPath)"
+				if access(path.fileSystemRepresentation, X_OK) == 0 {
+					return path
+				}
+			}
+		}
+		return nil
+	}
+
+	// TODO: Temporary workaround for XinaA15
+	private static let isXina: Bool = (try? URL(fileURLWithPath: "/var/Liy/xina").checkResourceIsReachable()) == true
+
+	/// roothide bootstraps live in a randomised root and hide it behind the `DYLD_*`
+	/// environment injected into apps; `login(1)` strips that environment, so the
+	/// login → helper → shell chain cannot start a bootstrap shell there. Detected by our
+	/// bundle living somewhere other than the classic `/var/jb`.
+	private static let isRoothide: Bool = !jailbreakRoot.isEmpty && jailbreakRoot != "/var/jb"
+
+	private static let loginPath: String? = {
+		#if targetEnvironment(macCatalyst)
 		return "/usr/bin/login"
 		#else
-		// TODO: Temporary workaround for XinaA15
-		if loginIsShell {
-			return "/var/jb/bin/zsh"
-		}
-		return ["/var/jb/usr/bin/login", "/usr/bin/login"]
-			.first { (try? URL(fileURLWithPath: $0).checkResourceIsReachable()) == true } ?? "/usr/bin/login"
+		return findTool(["usr/bin/login", "bin/login"])
 		#endif
 	}()
 
-	private static var loginArgv: [String] {
-		#if targetEnvironment(simulator)
-		return ["zsh", "--login", "-i"]
-		#else
-		// TODO: Temporary workaround for XinaA15
-		if loginIsShell {
-			return ["zsh", "--login", "-i"]
-		}
+	/// How the terminal process is launched.
+	private enum LaunchStrategy {
+		case login, helper, shell
+	}
 
+	private static let launchStrategy: LaunchStrategy = {
+		#if targetEnvironment(simulator)
+		return .shell
+		#elseif targetEnvironment(macCatalyst)
+		return .login
+		#else
+		if isXina {
+			return .shell
+		}
+		if isRoothide {
+			// Skip login(1): it would sanitise away the environment bootstrap shells need.
+			return loginHelper == nil ? .shell : .helper
+		}
+		if loginPath != nil, loginHelper != nil {
+			return .login
+		}
+		// No login(1) anywhere: run the helper (it still sets up the tty properly) or the shell.
+		return loginHelper == nil ? .shell : .helper
+		#endif
+	}()
+
+	/// The user’s shell, resolved against the jailbreak prefixes like the bootstrap expects
+	/// (`<root>/bin/zsh`, …), then the passwd shell, and finally `/bin/sh`, which every iOS ships.
+	private static let resolvedShellPath: String = {
+		if let shell = findTool(["bin/zsh", "usr/bin/zsh", "bin/bash", "usr/bin/bash", "bin/dash", "usr/bin/dash"]) {
+			return shell
+		}
+		if let passwdShell = userPasswd?.pw_shell {
+			let path = String(cString: passwdShell)
+			if access(path, X_OK) == 0 {
+				return path
+			}
+		}
+		return "/bin/sh"
+	}()
+
+	/// PATH for directly-launched shells: the jailbreak’s real (unmapped) directories first,
+	/// the system last — the same strategy as the standalone Terminal app, which is proven to
+	/// work on roothide bootstraps.
+	private static func defaultPath() -> String {
+		var parts: [String] = []
+		var seen = Set<String>()
+		func add(_ path: String) {
+			if !path.isEmpty && !seen.contains(path) {
+				seen.insert(path)
+				parts.append(path)
+			}
+		}
+		let standard = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+		if !jailbreakRoot.isEmpty {
+			for directory in standard { add(jailbreakRoot + directory) }
+		}
+		add(NSHomeDirectory() + "/.local/bin")
+		for directory in standard { add(directory) }
+		return parts.joined(separator: ":")
+	}
+
+	private static var loginArgv: [String] {
 		// Interestingly, despite what login(1) seems to imply, it still seems we need to manually
 		// handle passing the -q (force hush login) flag. iTerm2 does this, so I guess it’s fine?
 		let hushLoginURL = URL(fileURLWithPath: homeDirectory)/".hushlogin"
 		let hushLogin = (try? hushLoginURL.checkResourceIsReachable()) == true
-		return ["login", "-fp\(hushLogin ? "q" : "")", NSUserName(), loginHelper]
-		#endif
+		return ["login", "-fp\(hushLogin ? "q" : "")", NSUserName(), loginHelper ?? ""]
 	}
 
 	private static let baseEnvp: [String] = [
@@ -115,13 +208,6 @@ class SubProcess {
 			return nil
 		}
 		return pwd
-	}
-
-	private static var shell: String {
-		if let result = userPasswd?.pw_shell {
-			return String(cString: result)
-		}
-		return "/bin/bash"
 	}
 
 	private static var homeDirectory: String {
@@ -172,16 +258,51 @@ class SubProcess {
 
 		// TODO: At some point, come up with some way to keep track of working directory changes.
 		// When opening a new tab, we can switch straight to the previous tab’s working directory.
+		let executable: String
 		let argv: [UnsafeMutablePointer<CChar>?]
-		if Self.loginIsShell {
-			argv = Self.loginArgv.cStringArray
+		switch Self.launchStrategy {
+		case .login:
+			executable = Self.loginPath ?? "/usr/bin/login"
+			argv = (Self.loginArgv + [initialDirectory ?? Self.homeDirectory, Self.resolvedShellPath]).cStringArray
+
+		case .helper:
+			// Run NewTermLoginHelper directly: it does the login_tty dance (setsid, TIOCSCTTY),
+			// chdirs, and execs the shell with a login-shell argv[0]. The leading dash is checked
+			// by the helper’s sanity check.
+			executable = Self.loginHelper ?? Self.resolvedShellPath
+			argv = ["-NewTermLoginHelper", initialDirectory ?? Self.homeDirectory, Self.resolvedShellPath].cStringArray
+
+		case .shell:
+			executable = Self.resolvedShellPath
+			argv = ["zsh", "--login", "-i"].cStringArray
 			chdir(initialDirectory ?? Self.homeDirectory)
-		} else {
-			argv = (Self.loginArgv + [initialDirectory ?? Self.homeDirectory, Self.shell]).cStringArray
 		}
-		let envp = (ProcessInfo.processInfo.environment.map { "\($0)=\($1)" } + Self.baseEnvp + [
-			"LANG=\(localeCode)"
-		]).cStringArray
+
+		let environment: [String]
+		if Self.launchStrategy == .helper {
+			// Direct launches replace the app’s environment — the same strategy as the
+			// standalone Terminal app, which is proven to work on roothide bootstraps.
+			let home = Self.homeDirectory
+			var user = NSUserName()
+			if user.isEmpty || user.hasPrefix("/") {
+				user = "mobile"
+			}
+			environment = [
+				"PATH=\(Self.defaultPath())",
+				"HOME=\(home)",
+				"USER=\(user)",
+				"LOGNAME=\(user)",
+				"SHELL=\(Self.resolvedShellPath)",
+				"TMPDIR=/tmp"
+			] + Self.baseEnvp + [
+				"LANG=\(localeCode)"
+			]
+		} else {
+			environment = ProcessInfo.processInfo.environment.map { "\($0)=\($1)" } + Self.baseEnvp + [
+				"LANG=\(localeCode)"
+			]
+		}
+		let envp = environment.cStringArray
 
 		defer {
 			argv.deallocate()
@@ -189,7 +310,7 @@ class SubProcess {
 		}
 
 		var pid = pid_t()
-		let result = ie_posix_spawn(&pid, Self.login, &actions, nil, argv, envp)
+		let result = ie_posix_spawn(&pid, executable, &actions, nil, argv, envp)
 		close(fds.replica)
 		if result != 0 {
 			// Fork failed.

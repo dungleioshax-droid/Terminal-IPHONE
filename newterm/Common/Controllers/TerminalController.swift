@@ -185,6 +185,12 @@ public class TerminalController {
 			try subProcess!.start()
 		} catch {
 			subProcessFailureError = error
+			// Surface the underlying reason in the terminal window too — the launch-failure
+			// alert alone (“the shell process quit unexpectedly”) hides it.
+			let message = "\r\n\u{1b}[0;31m\(error.localizedDescription)\u{1b}[m\r\n"
+			if let data = message.data(using: .utf8) {
+				readInputStream(data)
+			}
 			throw error
 		}
 	}
