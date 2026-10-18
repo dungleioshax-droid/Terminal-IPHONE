@@ -77,16 +77,37 @@ class SubProcess {
 		#endif
 	}()
 
+	/// roothide bootstraps live under `/var/containers/Bundle/Application/.jbroot-<random>`;
+	/// scan for them so the shell can still be found if the bundle-derived root is unusable.
+	private static let roothideRoots: [String] = {
+		let applicationsDirectory = "/var/containers/Bundle/Application"
+		guard let entries = try? FileManager.default.contentsOfDirectory(atPath: applicationsDirectory) else {
+			return []
+		}
+		return entries
+			.filter { $0.hasPrefix(".jbroot-") }
+			.sorted()
+			.map { applicationsDirectory + "/" + $0 }
+	}()
+
 	/// Candidate jailbreak prefixes, most specific first. An empty string means the system root.
 	private static let jailbreakRoots: [String] = {
 		var roots: [String] = []
+		func add(_ root: String) {
+			if !roots.contains(root) {
+				roots.append(root)
+			}
+		}
 		if !jailbreakRoot.isEmpty {
-			roots.append(jailbreakRoot)
+			add(jailbreakRoot)
+		}
+		for root in roothideRoots {
+			add(root)
 		}
 		if jailbreakRoot != "/var/jb" {
-			roots.append("/var/jb")
+			add("/var/jb")
 		}
-		roots.append("")
+		add("")
 		return roots
 	}()
 
@@ -149,7 +170,7 @@ class SubProcess {
 	/// The user’s shell, resolved against the jailbreak prefixes like the bootstrap expects
 	/// (`<root>/bin/zsh`, …), then the passwd shell, and finally `/bin/sh`, which every iOS ships.
 	private static let resolvedShellPath: String = {
-		if let shell = findTool(["bin/zsh", "usr/bin/zsh", "bin/bash", "usr/bin/bash", "bin/dash", "usr/bin/dash"]) {
+		if let shell = findTool(["bin/zsh", "usr/bin/zsh", "bin/bash", "usr/bin/bash", "bin/dash", "usr/bin/dash", "bin/sh", "usr/bin/sh"]) {
 			return shell
 		}
 		if let passwdShell = userPasswd?.pw_shell {
@@ -180,6 +201,24 @@ class SubProcess {
 		add(NSHomeDirectory() + "/.local/bin")
 		for directory in standard { add(directory) }
 		return parts.joined(separator: ":")
+	}
+
+	/// Human-readable probe results when no shell could be found, written into the
+	/// terminal so an on-device screenshot explains the failure.
+	static var shellResolutionDiagnostics: String? {
+		guard resolvedShellPath == "/bin/sh" else {
+			return nil
+		}
+		var passwdShell = "(none)"
+		if let shell = userPasswd?.pw_shell, let value = String(validatingCString: shell) {
+			passwdShell = value
+		}
+		let probedRoots = jailbreakRoots.map { $0.isEmpty ? "/" : $0 }.joined(separator: " ")
+		var message = "\r\n\u{1b}[0;33m[NewTerm] No shell was found in the jailbreak — falling back to /bin/sh, which does not exist on iOS.\u{1b}[m\r\n"
+		message += "[NewTerm] probed roots: \(probedRoots)\r\n"
+		message += "[NewTerm] executable: \(Bundle.main.executablePath ?? "(unknown)")\r\n"
+		message += "[NewTerm] passwd shell: \(passwdShell)\r\n"
+		return message
 	}
 
 	private static var loginArgv: [String] {

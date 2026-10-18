@@ -181,6 +181,10 @@ public class TerminalController {
 		subProcess = SubProcess()
 		subProcess!.delegate = self
 		processLaunchDate = Date()
+		if let diagnostics = SubProcess.shellResolutionDiagnostics,
+				let data = diagnostics.data(using: .utf8) {
+			readInputStream(data)
+		}
 		do {
 			try subProcess!.start()
 		} catch {
