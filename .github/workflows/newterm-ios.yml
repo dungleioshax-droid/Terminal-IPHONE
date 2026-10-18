@@ -70,6 +70,8 @@ jobs:
           sh -n Tools/ai-runtime/99-newterm-ai.sh
           node --check Tools/ai-runtime/segmenter-shim.js
           node --check Tools/fetch-ai-runtime.mjs
+          # dpkg refuses maintainer scripts without the executable bit.
+          test -x layout/DEBIAN/postinst
 
       - name: Compile
         id: package_build
