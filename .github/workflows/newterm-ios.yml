@@ -47,8 +47,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Set up tooling (GNU make, ldid, xz)
-        run: brew install make ldid xz
+      - name: Set up tooling (GNU make, ldid, xz, cmark)
+        run: |
+          brew install make ldid xz cmark
+          # Make sure the tools are on PATH even if a formula is keg-only
+          # (the Xcode project needs `cmark`, and the AI runtime staging
+          # needs `xz`; theos needs a GNU make).
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix xz)/bin" >> "$GITHUB_PATH"
 
       - name: Set up Theos
         run: git clone --recursive --depth=1 'https://github.com/theos/theos.git' ~/theos
