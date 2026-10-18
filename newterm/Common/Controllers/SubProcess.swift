@@ -210,8 +210,8 @@ class SubProcess {
 			return nil
 		}
 		var passwdShell = "(none)"
-		if let shell = userPasswd?.pw_shell, let value = String(validatingCString: shell) {
-			passwdShell = value
+		if let shell = userPasswd?.pw_shell {
+			passwdShell = String(cString: shell)
 		}
 		let probedRoots = jailbreakRoots.map { $0.isEmpty ? "/" : $0 }.joined(separator: " ")
 		var message = "\r\n\u{1b}[0;33m[NewTerm] No shell was found in the jailbreak — falling back to /bin/sh, which does not exist on iOS.\u{1b}[m\r\n"
