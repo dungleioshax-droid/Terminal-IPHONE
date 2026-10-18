@@ -95,7 +95,7 @@ class SubProcess {
 		for root in jailbreakRoots {
 			for subPath in subPaths {
 				let path = root.isEmpty ? "/\(subPath)" : "\(root)/\(subPath)"
-				if access(path.fileSystemRepresentation, X_OK) == 0 {
+				if access(path, X_OK) == 0 {
 					return path
 				}
 			}
