@@ -352,7 +352,10 @@ class SubProcess {
 /// the `aienv` manager that NewTerm 3 AI installs into the jailbreak root).
 /// Every path is probed in order, so the same build works rootful, rootless
 /// (/var/jb) and RootHide (randomized root, reached through /usr/bin links).
-enum AIEnv {
+///
+/// Public so the app target (Settings → AI CLI) can use it across the
+/// NewTermCommon framework boundary.
+public enum AIEnv {
 
 	static let candidatePaths = [
 		"/usr/bin/aienv",
@@ -362,7 +365,7 @@ enum AIEnv {
 	]
 
 	/// Whether the AI environment helpers are installed at all.
-	static var available: Bool {
+	public static var available: Bool {
 		return aienvPath() != nil
 	}
 
@@ -376,7 +379,7 @@ enum AIEnv {
 	}
 
 	/// One-line summary for the settings screen.
-	static func statusSummary() -> String {
+	public static func statusSummary() -> String {
 		guard let aienv = aienvPath() else {
 			return "Not installed"
 		}
@@ -393,7 +396,7 @@ enum AIEnv {
 	/// Runs `aienv <command>` through /bin/sh (with libiosexec path mapping,
 	/// like terminal sessions do) and reports the exit code plus combined
 	/// stdout/stderr. Completion is called on a background queue.
-	static func run(_ command: String, completion: @escaping (Int32, String) -> Void) {
+	public static func run(_ command: String, completion: @escaping (Int32, String) -> Void) {
 		guard let aienv = aienvPath() else {
 			completion(127, "aienv was not found on this device.")
 			return
