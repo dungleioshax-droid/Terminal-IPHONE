@@ -1,15 +1,14 @@
 name: NewTerm 3 AI (iOS)
 
 # NewTerm 3 AI (source in newterm/) is a full iOS app built with Xcode through
-# Theos' xcodeproj.mk, so it needs a macOS runner — unlike the main Terminal
-# app, which this same repository builds on Linux (see build-deb.yml).
+# Theos' xcodeproj.mk, so it needs a macOS runner.
 #
 # Two .deb variants are produced from the same source:
 #   newterm3-ai-rootless.deb  iphoneos-arm64   (Procursus/Dopamine, /var/jb)
 #   newterm3-ai-roothide.deb  iphoneos-arm64e  (RootHide bootstrap)
 #
-# Only runs when something under newterm/ changed (or manually), so it does
-# not burn macOS runner minutes on Terminal-only pushes.
+# Only runs when something under newterm/ changed (or manually), so README-only
+# pushes do not burn macOS runner minutes.
 
 on:
   workflow_dispatch:
