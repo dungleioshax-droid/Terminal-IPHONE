@@ -1,0 +1,14 @@
+{
+  "name": "Terminal for iPhone",
+  "short_name": "Terminal",
+  "description": "A lightweight terminal emulator for iPhone.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "orientation": "any",
+  "icons": [
+    { "src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

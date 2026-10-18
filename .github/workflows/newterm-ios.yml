@@ -1,0 +1,88 @@
+name: NewTerm 3 AI (iOS)
+
+# NewTerm 3 AI (source in newterm/) is a full iOS app built with Xcode through
+# Theos' xcodeproj.mk, so it needs a macOS runner — unlike the main Terminal
+# app, which this same repository builds on Linux (see build-deb.yml).
+#
+# Two .deb variants are produced from the same source:
+#   newterm3-ai-rootless.deb  iphoneos-arm64   (Procursus/Dopamine, /var/jb)
+#   newterm3-ai-roothide.deb  iphoneos-arm64e  (RootHide bootstrap)
+#
+# Only runs when something under newterm/ changed (or manually), so it does
+# not burn macOS runner minutes on Terminal-only pushes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'newterm/**'
+      - '.github/workflows/newterm-ios.yml'
+  pull_request:
+    paths:
+      - 'newterm/**'
+      - '.github/workflows/newterm-ios.yml'
+
+jobs:
+  build:
+    name: NewTerm 3 AI (.deb, ${{ matrix.variant }})
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: newterm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: rootless
+            makeargs: ROOTLESS=1
+          - variant: roothide
+            makeargs: ROOTHIDE=1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up tooling (GNU make, ldid, xz)
+        run: brew install make ldid xz
+
+      - name: Set up Theos
+        run: git clone --recursive --depth=1 'https://github.com/theos/theos.git' ~/theos
+
+      - name: Sanity check the AI environment scripts
+        run: |
+          sh -n layout/DEBIAN/postinst
+          sh -n Tools/ai-runtime/aienv
+          sh -n Tools/ai-runtime/node
+          sh -n Tools/ai-runtime/npm
+          sh -n Tools/ai-runtime/npx
+          sh -n Tools/ai-runtime/claude-auth
+          sh -n Tools/ai-runtime/99-newterm-ai.sh
+          node --check Tools/ai-runtime/segmenter-shim.js
+          node --check Tools/fetch-ai-runtime.mjs
+
+      - name: Compile
+        id: package_build
+        run: |
+          gmake package THEOS=~/theos ${{ matrix.makeargs }} FINALPACKAGE=1
+          pkg="$(cat .theos/last_package)"
+          mkdir -p dist
+          cp "$pkg" "dist/newterm3-ai-${{ matrix.variant }}.deb"
+          echo "package=newterm/dist/newterm3-ai-${{ matrix.variant }}.deb" >> "$GITHUB_OUTPUT"
+          shasum -a 256 "dist/newterm3-ai-${{ matrix.variant }}.deb"
+
+      - name: Upload the .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: newterm3-ai-${{ matrix.variant }}
+          path: ${{ steps.package_build.outputs.package }}
+
+      - name: Attach to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package_build.outputs.package }}

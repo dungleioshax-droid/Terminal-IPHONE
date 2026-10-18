@@ -1,0 +1,89 @@
+#!/bin/sh
+# NewTerm 3 AI — post-install/upgrade script.
+#
+#  - registers the SpringBoard icon
+#  - fixes exec bits, adds <root>/usr/bin symlinks and re-signs the bundled
+#    Node.js runtime with the JIT entitlements shipped inside the package
+#  - kicks off the AI environment bootstrap (node sanity + Claude Code
+#    install through the bundled npm) in the background
+#    -> log: /var/mobile/newterm-ai.log
+#
+# Every jailbreak path is resolved at runtime so the same package works
+# rootful ("" root), rootless (/var/jb) and RootHide (randomized root).
+set -u
+
+# Derive the jailbreak root from a tool that lives in <root>/usr/bin.
+pkg_root() {
+	for tool in apt-get uicache dpkg; do
+		p=$(command -v "$tool" 2>/dev/null) || continue
+		[ -n "$p" ] || continue
+		d=$(dirname "$p")
+		[ "$(basename "$d")" = "bin" ] || continue
+		# Rootful legacy layout: /usr/bin/x lives directly on the system root.
+		if [ "$(dirname "$d")" = "/" ]; then
+			echo ""
+			return 0
+		fi
+		[ "$(basename "$(dirname "$d")")" = "usr" ] || continue
+		(CDPATH= cd -- "$d/../.." 2>/dev/null && pwd -P) && return 0
+	done
+	# Last resort: classic rootless prefix.
+	if [ -x /var/jb/usr/bin/uicache ]; then
+		echo "/var/jb"
+		return 0
+	fi
+	echo ""
+}
+
+ROOT=$(pkg_root)
+APP="${ROOT}/Applications/NewTerm.app"
+BIN="${ROOT}/usr/local/bin"
+NODEHOST="${ROOT}/usr/local/lib/nodejs/node"
+NODEENTS="${ROOT}/usr/local/lib/nodejs/entitlements.xml"
+
+# 1. Register the app icon with SpringBoard.
+if [ -d "$APP" ]; then
+	if [ -x "${ROOT}/usr/bin/uicache" ]; then
+		"${ROOT}/usr/bin/uicache" -p "$APP" >/dev/null 2>&1 || true
+	elif command -v uicache >/dev/null 2>&1; then
+		uicache -p "$APP" >/dev/null 2>&1 || true
+	fi
+fi
+
+# 2. Make the AI environment helpers executable and add PATH-safe symlinks in
+#    <root>/usr/bin (relative targets, so they survive RootHide relocation).
+chmod 755 "$BIN/node" "$BIN/npm" "$BIN/npx" "$BIN/aienv" "$BIN/claude-auth" 2>/dev/null || true
+if [ -d "${ROOT}/usr/bin" ]; then
+	for f in aienv node npm npx claude-auth claude; do
+		if [ -e "$BIN/$f" ]; then
+			ln -sf "../local/bin/$f" "${ROOT}/usr/bin/$f" 2>/dev/null || true
+		fi
+	done
+fi
+
+# 3. Re-sign the Node.js binary with the bundled JIT entitlements (needs ldid;
+#    missing ldid is logged by `aienv doctor` as a warning rather than a hard
+#    failure).
+if [ -x "$NODEHOST" ] && [ -f "$NODEENTS" ]; then
+	LDID="${ROOT}/usr/bin/ldid"
+	[ -x "$LDID" ] || LDID=$(command -v ldid 2>/dev/null || true)
+	if [ -n "${LDID:-}" ]; then
+		"$LDID" -S"$NODEENTS" "$NODEHOST" >/dev/null 2>&1 || true
+	fi
+fi
+
+# 4. Bootstrap the AI environment (Node check, npm sanity, claude-code
+#    install) in the background.
+if [ -x "$BIN/aienv" ]; then
+	LOG=/var/mobile/newterm-ai.log
+	if [ -x /usr/bin/nohup ]; then
+		AIENV_LOG="$LOG" /usr/bin/nohup "$BIN/aienv" bootstrap >>"$LOG" 2>&1 &
+	else
+		AIENV_LOG="$LOG" "$BIN/aienv" bootstrap >>"$LOG" 2>&1 &
+	fi
+fi
+
+# 5. Restart NewTerm so the freshly installed build is used after an upgrade.
+killall NewTerm 2>/dev/null || true
+
+exit 0

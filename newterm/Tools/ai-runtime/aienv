@@ -1,0 +1,301 @@
+#!/bin/sh
+# aienv — AI environment manager for NewTerm 3 AI.
+#
+#   aienv doctor          run all environment checks (read-only)
+#   aienv fix-node        (re)install the embedded Node.js runtime on device
+#   aienv install-claude  npm-install @anthropic-ai/claude-code (pinned JS rev)
+#   aienv python          best-effort python3 + pip via the jailbreak's apt
+#   aienv status/doctor/bootstrap/version/help
+#
+# Works rootful, rootless (/var/jb) and RootHide (randomized root) because
+# every jailbreak path is derived from this script's own location.
+set -u
+
+r=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." 2>/dev/null && pwd -P) || r=""
+
+NODEBIN="$r/usr/local/bin/node"
+NODEHOST="$r/usr/local/lib/nodejs/node"
+NODEENTS="$r/usr/local/lib/nodejs/entitlements.xml"
+NPMBIN="$r/usr/local/bin/npm"
+AIENV_SHIM="$r/usr/local/share/aienv/segmenter-shim.js"
+
+CLAUDE_PACKAGE="@anthropic-ai/claude-code"
+CLAUDE_VERSION="${CLAUDE_VERSION:-2.1.19}"
+CLAUDE_NODE_DEB_URL="${AIENV_NODE_DEB_URL:-https://raw.githubusercontent.com/imcynic/nodejs-ios/main/nodejs_18.20.4-1_iphoneos-arm64.deb}"
+CLAUDE_CONFIG_DIR="${HOME:-/var/mobile}/.claude"
+
+QUIET="${AIENV_QUIET:-0}"
+LOG="${AIENV_LOG:-/var/mobile/aienv.log}"
+mkdir -p "$(dirname -- "$LOG")" 2>/dev/null || true
+touch "$LOG" 2>/dev/null || LOG=/dev/null
+OK=0; WARN=0; FAIL=0
+
+say()   { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+logline() { [ "$LOG" = "/dev/null" ] || { echo "$*" >> "$LOG" 2>/dev/null || true; }; }
+ok()    { OK=$((OK + 1)); say "  [ok] $*"; }
+warn()  { WARN=$((WARN + 1)); say "  [!!] $*"; logline "  [!!] $*"; }
+bad()   { FAIL=$((FAIL + 1)); say "  [xx] $*"; logline "  [xx] $*"; }
+
+node_version() { "$NODEBIN" --version 2>/dev/null; }
+node_works()   { node_version >/dev/null 2>&1; }
+npm_works()    { "$NPMBIN" --version >/dev/null 2>&1; }
+net_up()	{
+	command -v curl >/dev/null 2>&1 || return 1
+	curl -fsS --connect-timeout 8 -o /dev/null https://registry.npmjs.org/ 2>/dev/null
+}
+
+find_ldid() {
+	if [ -x "$r/usr/bin/ldid" ]; then echo "$r/usr/bin/ldid"
+	elif command -v ldid >/dev/null 2>&1; then echo "ldid"
+	else echo ""
+	fi
+}
+
+sign_runtime() {
+	ldid=$(find_ldid)
+	if [ -z "$ldid" ] || [ ! -x "$NODEHOST" ] || [ ! -f "$NODEENTS" ]; then return 0; fi
+	"$ldid" -S"$NODEENTS" "$NODEHOST" 2>/dev/null && return 0
+	return 0
+}
+
+# Make the bundled tools reachable through <root>/usr/bin too, in case the
+# shell's PATH does not include <root>/usr/local/bin. Relative symlinks so
+# they keep working when the jailbreak root is relocated (RootHide).
+usrbin_links() {
+	[ -d "$r/usr/bin" ] || return 0
+	for f in aienv node npm npx claude-auth claude; do
+		if [ -e "$r/usr/local/bin/$f" ]; then
+			ln -sf "../local/bin/$f" "$r/usr/bin/$f" 2>/dev/null || true
+		fi
+	done
+}
+
+# ---- doctor -------------------------------------------------------------
+
+check_node_runtime() {
+	if [ -x "$NODEHOST" ]; then
+		ok "Node.js binary present: $NODEHOST ($(wc -c < "$NODEHOST" 2>/dev/null || echo '?') bytes)"
+		if [ -f "$NODEENTS" ]; then
+			ok "JIT entitlements file present"
+		else
+			warn "entitlements.xml missing — re-signing skipped"
+		fi
+		if find_ldid >/dev/null 2>&1 && [ -n "$(find_ldid)" ]; then
+			ok "ldid available"
+		else
+			warn "ldid not found (if 'node' crashes: run: ldid -S$NODEENTS $NODEHOST)"
+		fi
+	else
+		bad "Node.js runtime missing at $NODEHOST — run: aienv fix-node"
+	fi
+	if node_works; then
+		ok "node: $(node_version) (with iOS-safe V8 flags)"
+	else
+		bad "node does not start (run: aienv fix-node; see aienv help)"
+	fi
+}
+
+check_npm() {
+	if [ -f "$r/usr/local/lib/node_modules/npm/bin/npm-cli.js" ]; then
+		if npm_works; then ok "npm: $("$NPMBIN" --version)"; else bad "npm present but not running"; fi
+	else
+		bad "npm runtime missing (reinstall the NewTerm 3 AI package)"
+	fi
+}
+
+show_claude_status() {
+	if [ -x "$r/usr/local/bin/claude" ] && "$r/usr/local/bin/claude" --version >/dev/null 2>&1; then
+		ver=$("$r/usr/local/bin/claude" --version 2>/dev/null | head -n 1)
+		ok "claude-code: ${ver:-installed}"
+		CLAUDE_STATE=present
+	elif [ -f "$r/usr/local/lib/node_modules/$CLAUDE_PACKAGE/cli.js" ]; then
+		warn "claude-code js present but not linked — run: aienv install-claude"
+		CLAUDE_STATE=missing
+	else
+		warn "claude-code not installed — run: aienv install-claude"
+		CLAUDE_STATE=missing
+	fi
+	if [ -f "$CLAUDE_CONFIG_DIR/.credentials.json" ]; then
+		if grep -q claudeAiOauth "$CLAUDE_CONFIG_DIR/.credentials.json" 2>/dev/null; then
+			ok "auth: Claude Max/Pro (OAuth)"
+		else
+			ok "auth: API key present"
+		fi
+	else
+		warn "auth: not configured — run: claude-auth"
+	fi
+}
+
+doctor() {
+	say ""
+	say "aienv doctor — NewTerm 3 AI environment"
+	say "======================================="
+	say "jailbreak root : ${r:-(system root)}"
+	say "home           : ${HOME:-?}"
+	say "PATH           : ${PATH:-(empty)}"
+	say ""
+	if [ -x "$NODEHOST" ]; then check_node_runtime; else bad "node runtime missing"; fi
+	check_npm
+	if [ -f "$AIENV_SHIM" ]; then ok "segmenter shim installed"; else warn "segmenter shim missing"; fi
+	net_up && ok "network: registry.npmjs.org reachable" || warn "network unreachable (Claude install needs it)"
+	show_claude_status
+	say ""
+	say "summary: ok=$OK warn=$WARN fail=$FAIL"
+	case $FAIL in
+		0)
+			if [ "${CLAUDE_STATE:-missing}" = "present" ]; then
+				say "Result: READY — claude-auth (if needed), then claude"
+			else
+				say "Result: runtime OK — run: aienv install-claude (or Settings → AI CLI)"
+			fi
+			;;
+		*) say "Run: aienv fix-node && aienv install-claude" ;;
+	esac
+	return 0
+}
+
+fix_node() {
+	say "aienv fix-node"
+	if node_works 2>/dev/null; then
+		say "  [ok] node already working: $(node_version)"
+		return 0
+	fi
+	if [ ! -x "$NODEHOST" ]; then
+		say "  [..] fetching the Node.js runtime ($CLAUDE_NODE_DEB_URL)"
+		tmp="${TMPDIR:-/tmp}/aienv-node-deb.$$"
+		if command -v curl >/dev/null 2>&1 && curl -fL --connect-timeout 30 -o "$tmp" "$CLAUDE_NODE_DEB_URL" 2>/dev/null; then
+			xd="$tmp.d"
+			mkdir -p "$xd"
+			if command -v dpkg >/dev/null 2>&1; then
+				dpkg -x "$tmp" "$xd" 2>/dev/null || true
+			elif command -v ar >/dev/null 2>&1; then
+				(cd "$xd" && ar xo "$tmp" 2>/dev/null) || true
+				(cd "$xd" && tar -xf data.tar.xz 2>/dev/null) || true
+			fi
+			src="$xd/var/jb/usr/local/lib/nodejs/node"
+			ents="$xd/var/jb/usr/local/lib/nodejs/entitlements.xml"
+			if [ -f "$src" ]; then
+				mkdir -p "$r/usr/local/lib/nodejs"
+				cp -f "$src" "$NODEHOST"
+				[ -f "$ents" ] && cp -f "$ents" "$NODEENTS"
+				chmod 755 "$NODEHOST"
+				say "  [ok] runtime installed from network"
+			else
+				bad "downloaded deb had no payload (reinstall the NewTerm 3 AI package)"
+				rm -f "$tmp"; rm -rf "$xd"
+				return 1
+			fi
+			rm -f "$tmp"; rm -rf "$xd"
+		else
+			bad "could not download the runtime (network offline?)"
+			return 1
+		fi
+	else
+		say "  [..] re-signing existing runtime"
+	fi
+	chmod 755 "$NODEHOST" 2>/dev/null || true
+	sign_runtime
+	if node_works; then
+		say "  [ok] node works: $(node_version)"
+		return 0
+	fi
+	bad "node still not starting. Check: ldid availability, storage, or reinstall."
+	return 1
+}
+
+install_claude() {
+	ver="${1:-$CLAUDE_VERSION}"
+	say "aienv install-claude ($CLAUDE_PACKAGE@$ver)"
+	if [ -x "$r/usr/local/bin/claude" ] && "$r/usr/local/bin/claude" --version >/dev/null 2>&1; then
+		say "  [ok] claude already installed — auth with: claude-auth"
+		usrbin_links
+		return 0
+	fi
+	if ! npm_works; then
+		bad "npm is not ready — run: aienv fix-node"
+		return 1
+	fi
+	n=0
+	while [ $n -lt 2 ]; do
+		n=$((n + 1))
+		say "  [..] npm install (attempt $n)"
+		if "$NPMBIN" install -g --no-fund --no-audit "$CLAUDE_PACKAGE@$ver"; then
+			# Re-sign the native bits npm shipped unsigned for macOS: without
+			# this the ripgrep helper segfaults on iOS (claude stays usable,
+			# just with degraded search).
+			vendor="$r/usr/local/lib/node_modules/$CLAUDE_PACKAGE/vendor/ripgrep/arm64-darwin"
+			ldid=$(find_ldid)
+			if [ -n "$ldid" ] && [ -d "$vendor" ]; then
+				say "  [..] ldid-signing the ripgrep helper"
+				for f in "$vendor"/*.node "$vendor/rg"; do
+					[ -f "$f" ] || continue
+					"$ldid" -S "$f" >/dev/null 2>&1 || true
+				done
+			fi
+			usrbin_links
+			say "  [ok] installed"
+			say ""
+			say "Next steps:"
+			say "  claude-auth     authenticate (API key or Max/Pro OAuth)"
+			say "  claude          start Claude Code"
+			return 0
+		fi
+	done
+	bad "npm install failed (network or storage). Retry: aienv install-claude"
+	return 1
+}
+
+python_env() {
+	apt="$r/usr/bin/apt-get"
+	[ -x "$apt" ] || { say "  [xx] apt-get not found in the jailbreak root"; return 1; }
+	say "  [..] installing python3 + pip via the jailbreak apt repo"
+	"$apt" update -y >/dev/null 2>&1 || true
+	if "$apt" install -y python3 python3-pip >/dev/null 2>&1; then
+		say "  [ok] python3 ready: $(command -v python3 2>/dev/null || echo '?')"
+	else
+		warn "python3 could not be installed (repo offline?)"
+	fi
+	return 0
+}
+
+bootstrap() {
+	case ${1:-} in install-claude) install_claude "${2:-$CLAUDE_VERSION}"; return $? ;; esac
+	say "aienv bootstrap"
+	fix_node || true
+	if npm_works; then
+		if ! "$r/usr/local/bin/claude" --version >/dev/null 2>&1 && \
+		   [ ! -f "$r/usr/local/lib/node_modules/$CLAUDE_PACKAGE/cli.js" ]; then
+			install_claude || true
+		fi
+	fi
+	usrbin_links
+	if node_works && npm_works; then
+		say "  [ok] environment ready — run: aienv doctor for the panel"
+	else
+		say "  [..] partial — run 'aienv doctor' inside NewTerm for details"
+	fi
+}
+
+case "${1:-doctor}" in
+	doctor)  doctor ;;
+	fix-node) fix_node ;;
+	install-claude) shift; install_claude "$@" ;;
+	python)  python_env ;;
+	bootstrap) shift 2>/dev/null; bootstrap "$@" ;;
+	status)  doctor ;;
+	version)
+		if node_works; then echo "node $(node_version)"; else say "node: not installed — run: aienv fix-node"; fi
+		;;
+	help|-h|--help|"")
+		say "aienv — AI environment manager for NewTerm 3 AI"
+		say "usage: aienv <command>"
+		say "  doctor          full diagnostic panel"
+		say "  fix-node        (re)install / re-sign the Node.js runtime"
+		say "  install-claude  npm-install @anthropic-ai/claude-code"
+		say "  python          best-effort python3 + pip"
+		say "  bootstrap       postinst background bootstrap (do not call by hand)"
+		say "  version         node --version"
+		say "All paths are resolved jb-relative (rootless / roothide safe)."
+		;;
+	*) say "aienv: unknown command '$1' (try: aienv help)"; exit 2 ;;
+esac

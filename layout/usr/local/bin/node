@@ -1,0 +1,22 @@
+#!/bin/sh
+# Terminal-IPHONE Node.js runner.
+#
+# - Resolves its own jailbreak root dynamically, so the same file works
+#   rootful (""), rootless (/var/jb) and RootHide (randomized root).
+# - Runs the real arm64 iOS binary with the V8 flags that keep Node.js stable
+#   on iOS (community-verified for claude-code), and preloads the
+#   Intl.Segmenter shim that fixes V8's incomplete ICU data on iOS.
+r=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." 2>/dev/null && pwd -P) || r=""
+NODEBIN="$r/usr/local/lib/nodejs/node"
+FLAGS="--no-wasm-code-gc --no-opt --no-sparkplug --single-threaded --liftoff --no-wasm-tier-up"
+SHIM="$r/usr/local/share/aienv/segmenter-shim.js"
+if [ -f "$SHIM" ]; then
+	FLAGS="$FLAGS -r $SHIM"
+fi
+if [ ! -x "$NODEBIN" ]; then
+	echo "aienv: Node.js runtime is not installed at $NODEBIN." >&2
+	echo "aienv: run 'aienv fix-node' (or reinstall terminal-iphone-app-roothide)." >&2
+	exit 127
+fi
+# FLAGS is word-split on purpose (fixed, safe, internal values).
+exec "$NODEBIN" $FLAGS "$@"

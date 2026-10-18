@@ -1,0 +1,15 @@
+#!/bin/sh
+# NewTerm 3 AI — npm 10.8.2 (last npm line compatible with Node 18),
+# staged by the package into <root>/usr/local/lib/node_modules/npm.
+r=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." 2>/dev/null && pwd -P) || r=""
+NODE="$r/usr/local/bin/node"
+NPMCLI="$r/usr/local/lib/node_modules/npm/bin/npm-cli.js"
+if [ ! -f "$NPMCLI" ]; then
+	echo "aienv: npm runtime is not installed at $NPMCLI." >&2
+	echo "aienv: run 'aienv fix-node' (or reinstall the NewTerm 3 AI package)." >&2
+	exit 127
+fi
+export NPM_CONFIG_PREFIX="$r/usr/local"
+export npm_config_prefix="$r/usr/local"
+export HOME="${HOME:-/var/mobile}"
+exec "$NODE" "$NPMCLI" "$@"

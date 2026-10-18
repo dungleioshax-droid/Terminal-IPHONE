@@ -1,0 +1,14 @@
+Package: ws.hbang.newterm3
+Name: NewTerm 3 AI
+Depends: firmware (>= 14.0), zsh | bash | fish, coreutils, ncurses, system-cmds
+Recommends: gettext-localizations, iterm2-shell-integration, zsh-autosuggestions, zsh-syntax-highlighting
+Conflicts: ws.hbang.newterm, ws.hbang.newterm2
+Replaces: ws.hbang.newterm, ws.hbang.newterm2
+Version: 3.0~beta1+ai1
+Architecture: iphoneos-arm
+Description: NewTerm 3 fork (original by HASHBANG Productions) with a bundled AI CLI environment — Node.js 18, npm, aienv and claude-auth ship inside the package and install Claude Code on first run (Settings → AI CLI).
+Maintainer: Terminal-IPHONE <dungleioshax@gmail.com>
+Author: dungleioshax-droid
+Section: Terminal Support
+Icon: https://img.chariz.cloud/icon/newterm-beta/icon@3x.png
+Tag: compatible_min::ios14.0

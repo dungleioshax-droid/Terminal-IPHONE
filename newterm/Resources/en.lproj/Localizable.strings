@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Generic title displayed before the terminal sets a proper title. -->
+	<key>TERMINAL</key>
+	<string>Terminal</string>
+
+	<!-- Title of Settings page. -->
+	<key>SETTINGS</key>
+	<string>Settings</string>
+
+	<!-- Title of About page. -->
+	<key>ABOUT</key>
+	<string>About NewTerm</string>
+
+	<!-- VoiceOver label for the password manager button. -->
+	<key>PASSWORD_MANAGER</key>
+	<string>Password Manager</string>
+
+	<!-- Message displayed in the terminal when it fails to start. -->
+	<key>TERMINAL_LAUNCH_FAILED</key>
+	<string>The shell process quit unexpectedly.</string>
+
+	<!-- Alert title displayed when a terminal could not be launched. -->
+	<key>TERMINAL_LAUNCH_FAILED_TITLE</key>
+	<string>Couldn’t start the terminal because the shell process quit unexpectedly.</string>
+
+	<!-- Alert body displayed when a terminal could not be launched. -->
+	<key>TERMINAL_LAUNCH_FAILED_BODY</key>
+	<string>Refer to the error message in the terminal window for more details.
+You may need to review startup scripts or reinstall core packages to fix this issue.</string>
+
+	<!-- Title displayed when the terminal’s process has ended. -->
+	<key>PROCESS_COMPLETED_TITLE</key>
+	<string>Session Ended</string>
+
+	<!-- VoiceOver label for the new tab button. -->
+	<key>NEW_TAB</key>
+	<string>New Tab</string>
+
+	<!-- VoiceOver label for the close tab button. -->
+	<key>CLOSE_TAB</key>
+	<string>Close Tab</string>
+
+	<!-- VoiceOver label for the new window button. -->
+	<key>NEW_WINDOW</key>
+	<string>New Window</string>
+
+	<!-- VoiceOver label for the close window button. -->
+	<key>CLOSE_WINDOW</key>
+	<string>Close Window</string>
+
+	<!-- VoiceOver label for a button that clears the terminal. -->
+	<key>CLEAR_TERMINAL</key>
+	<string>Clear Terminal</string>
+
+	<!-- VoiceOver label for the button that reveals the password manager. -->
+	<key>PASSWORD_MANAGER</key>
+	<string>Password Manager</string>
+
+	<!-- Label for a keyboard shortcut that selects the previous tab. -->
+	<key>SHOW_PREVIOUS_TAB</key>
+	<string>Show Previous Tab</string>
+
+	<!-- Label for a keyboard shortcut that selects the next tab. -->
+	<key>SHOW_NEXT_TAB</key>
+	<string>Show Next Tab</string>
+
+	<!-- VoiceOver label for a button that splits the tab horizontally and adds a new terminal below. -->
+	<key>SPLIT_HORIZONTALLY</key>
+	<string>Split Horizontally</string>
+
+	<!-- VoiceOver label for a button that splits the tab vertically and adds a new terminal to the right. -->
+	<key>SPLIT_VERTICALLY</key>
+	<string>Split Vertically</string>
+
+	<!-- Settings option to use the operating system’s locale. %@ is the user’s operating system language. -->
+	<key>LOCALE_SYSTEM</key>
+	<string>System Language: %@</string>
+</dict>
+</plist>

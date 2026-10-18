@@ -1,0 +1,12 @@
+# Theos build tree
+.theos/
+*.theos/
+
+# Node
+node_modules/
+
+# Runtime staging (Node binary + npm, filled by scripts/fetch-runtime.mjs)
+build/
+
+# Local test artifacts
+*.log
